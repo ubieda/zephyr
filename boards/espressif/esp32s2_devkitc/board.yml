@@ -1,5 +1,0 @@
-board:
-  name: esp32s2_devkitc
-  vendor: espressif
-  socs:
-  - name: esp32s2
