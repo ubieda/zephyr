@@ -240,6 +240,14 @@ static struct sensor_read_config iodev_sensor_shell_read_config = {
 	.channels = iodev_sensor_shell_channels,
 	.count = 0,
 	.max = ARRAY_SIZE(iodev_sensor_shell_channels),
+	/** We can't re-submit an in-progress work-item as we need the
+	 * associated iodev_sqe reference to provide cqe result. We are
+	 * initializing it here as we're not using the SENSOR_DT_READ_IODEV()
+	 * or SENSOR_DT_STREAM_IODEV() macros.
+	 */
+	.shim.work.done_sem =
+		Z_SEM_INITIALIZER(
+			iodev_sensor_shell_read_config.shim.work.done_sem, 1, 1),
 };
 RTIO_IODEV_DEFINE(iodev_sensor_shell_read, &__sensor_iodev_api, &iodev_sensor_shell_read_config);
 

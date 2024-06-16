@@ -29,6 +29,7 @@
 #include <zephyr/dsp/types.h>
 #include <zephyr/rtio/rtio.h>
 #include <zephyr/sys/iterable_sections.h>
+#include <zephyr/sys/p4wq.h>
 #include <zephyr/types.h>
 
 #ifdef __cplusplus
@@ -628,6 +629,13 @@ struct sensor_read_config {
 	};
 	size_t count;
 	const size_t max;
+	/** TODO: Temporary Shim. Remove it once the bus drivers support RTIO
+	 * and @ref sensor_submit_t implementations are asynchronous.
+	 */
+	struct {
+		struct k_p4wq_work work;
+		struct rtio_iodev_sqe *iodev_sqe;
+	} shim;
 };
 
 /**
@@ -653,6 +661,9 @@ struct sensor_read_config {
 		.channels = _CONCAT(__channel_array_, name),                                       \
 		.count = ARRAY_SIZE(_CONCAT(__channel_array_, name)),                              \
 		.max = ARRAY_SIZE(_CONCAT(__channel_array_, name)),                                \
+		.shim.work.done_sem =                                                              \
+			Z_SEM_INITIALIZER(                                                         \
+				_CONCAT(__sensor_read_config_, name).shim.work.done_sem, 1, 1),    \
 	};                                                                                         \
 	RTIO_IODEV_DEFINE(name, &__sensor_iodev_api, _CONCAT(&__sensor_read_config_, name))
 
@@ -683,6 +694,9 @@ struct sensor_read_config {
 		.triggers = _CONCAT(__trigger_array_, name),                                       \
 		.count = ARRAY_SIZE(_CONCAT(__trigger_array_, name)),                              \
 		.max = ARRAY_SIZE(_CONCAT(__trigger_array_, name)),                                \
+		.shim.work.done_sem =                                                              \
+			Z_SEM_INITIALIZER(                                                         \
+				_CONCAT(__sensor_read_config_, name).shim.work.done_sem, 1, 1),    \
 	};                                                                                         \
 	RTIO_IODEV_DEFINE(name, &__sensor_iodev_api, &_CONCAT(__sensor_read_config_, name))
 

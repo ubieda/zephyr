@@ -25,8 +25,25 @@ config SENSOR_ASYNC_API
 	select RTIO
 	select RTIO_SYS_MEM_BLOCKS
 	select RTIO_CONSUME_SEM
+	select SCHED_DEADLINE
 	help
 	  Enables the asynchronous sensor API by leveraging the RTIO subsystem.
+
+if SENSOR_ASYNC_API
+
+config SENSOR_ASYNC_API_WQ_PRIO
+	int "Thread priority of Sensor P4WQ's"
+	default MAIN_THREAD_PRIORITY
+
+config SENSOR_ASYNC_API_WQ_STACK_SIZE
+	int "Thread stack-size of Sensor P4-Workqueues"
+	default 2048
+
+config SENSOR_ASYNC_WQ_THREADS_POOL
+	int "Number of threads to use for processing asynchronous work-items"
+	default 1
+
+endif # SENSOR_ASYNC_API
 
 config SENSOR_SHELL
 	bool "Sensor shell"

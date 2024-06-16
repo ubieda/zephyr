@@ -20,6 +20,9 @@ static struct sensor_read_config iodev_sensor_shell_stream_config = {
 	.triggers = &iodev_sensor_shell_trigger,
 	.count = 0,
 	.max = 1,
+	.shim.work.done_sem =
+		Z_SEM_INITIALIZER(
+			iodev_sensor_shell_stream_config.shim.work.done_sem, 1, 1),
 };
 RTIO_IODEV_DEFINE(iodev_sensor_shell_stream, &__sensor_iodev_api,
 		  &iodev_sensor_shell_stream_config);

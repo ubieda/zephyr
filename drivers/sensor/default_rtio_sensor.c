@@ -18,11 +18,33 @@ LOG_MODULE_REGISTER(sensor_compat, CONFIG_SENSOR_LOG_LEVEL);
  */
 BUILD_ASSERT((sizeof(struct sensor_data_generic_header) % sizeof(struct sensor_chan_spec)) == 0);
 
+/** Shim layer to decouple async sensor read API.
+ * This has been introduced due to most sensor drivers implementing the submit API in a
+ * synchronous/blocking fashion. This shim shall go once that approach changes towards an
+ * asynchronous flow.
+ */
+#define SENSOR_ASYNC_WQ_THREADS CONFIG_SENSOR_ASYNC_WQ_THREADS_POOL
+#define SENSOR_ASYNC_WQ_STACK_SIZE CONFIG_SENSOR_ASYNC_API_WQ_STACK_SIZE
+
+#define SENSOR_ASYNC_WQ_PRIO_MED CONFIG_SENSOR_ASYNC_API_WQ_PRIO
+#define SENSOR_ASYNC_WQ_PRIO_HIGH SENSOR_ASYNC_WQ_PRIO_MED - 1
+#define SENSOR_ASYNC_WQ_PRIO_LOW SENSOR_ASYNC_WQ_PRIO_MED + 1
+
+K_P4WQ_DEFINE(sensor_async_wq,
+	      SENSOR_ASYNC_WQ_THREADS,
+	      SENSOR_ASYNC_WQ_STACK_SIZE);
+
 static void sensor_submit_fallback(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe);
 
-static void sensor_iodev_submit(struct rtio_iodev_sqe *iodev_sqe)
+static void sensor_iodev_submit(struct k_p4wq_work *work)
 {
-	const struct sensor_read_config *cfg = iodev_sqe->sqe.iodev->data;
+	/** Added by the shim in order to backtrace the data from the work item.
+	 * Originally, cfg is in iodev_sqe->sqe.iodev->data
+	 */
+	struct sensor_read_config *cfg = CONTAINER_OF(work,
+						      struct sensor_read_config,
+						      shim.work);
+	struct rtio_iodev_sqe *iodev_sqe = cfg->shim.iodev_sqe;
 	const struct device *dev = cfg->sensor;
 	const struct sensor_driver_api *api = dev->api;
 
@@ -35,8 +57,49 @@ static void sensor_iodev_submit(struct rtio_iodev_sqe *iodev_sqe)
 	}
 }
 
+static void sensor_iodev_submit_async(struct rtio_iodev_sqe *iodev_sqe)
+{
+	struct sensor_read_config *cfg = iodev_sqe->sqe.iodev->data;
+	struct k_p4wq_work *work = &cfg->shim.work;
+	struct rtio_sqe *sqe = &iodev_sqe->sqe;
+
+	/** We can't override iodev_sqe for an in-progress work-item,
+	 * as we need it for in-progress work items to provide the cqe
+	 * result.
+	 */
+	if (k_p4wq_wait(work, K_NO_WAIT) != 0) {
+		LOG_ERR("submit request rejected: Reader operation in progress");
+		rtio_iodev_sqe_err(iodev_sqe, -EBUSY);
+		return;
+	}
+
+	/** Link the iodev_sqe so that we can get it on the k_p4wq_work work
+	 * item. This assumes we can only have a single iodev_sqe queued per
+	 * read configuration.
+	 */
+	cfg->shim.iodev_sqe = iodev_sqe;
+
+	/** Cancel the item in case it's queued */
+	(void)k_p4wq_cancel(&sensor_async_wq, work);
+
+	/** Set the required information to handle the action */
+	work->handler = sensor_iodev_submit;
+	work->deadline = 0;
+
+	if (sqe->prio == RTIO_PRIO_LOW) {
+		work->priority = SENSOR_ASYNC_WQ_PRIO_LOW;
+	} else if (sqe->prio == RTIO_PRIO_HIGH) {
+		work->priority = SENSOR_ASYNC_WQ_PRIO_HIGH;
+	} else {
+		work->priority = SENSOR_ASYNC_WQ_PRIO_MED;
+	}
+
+	/** Decoupling action: Let the P4WQ execute the action. */
+	k_p4wq_submit(&sensor_async_wq, work);
+}
+
 const struct rtio_iodev_api __sensor_iodev_api = {
-	.submit = sensor_iodev_submit,
+	.submit = sensor_iodev_submit_async,
 };
 
 /**

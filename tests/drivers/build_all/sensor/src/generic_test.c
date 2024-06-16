@@ -34,6 +34,9 @@ static struct sensor_chan_spec iodev_all_channels[SENSOR_CHAN_ALL];
 static struct sensor_read_config iodev_read_config = {
 	.channels = iodev_all_channels,
 	.max = SENSOR_CHAN_ALL,
+	.shim.work.done_sem =
+		Z_SEM_INITIALIZER(
+			iodev_read_config.shim.work.done_sem, 1, 1),
 };
 RTIO_IODEV_DEFINE(iodev_read, &__sensor_iodev_api, &iodev_read_config);
 
