@@ -1,15 +1,18 @@
 /*
  * Copyright (c) 2023 Google LLC
+ * Copyright (c) 2024 Croxel Inc.
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <zephyr/logging/log.h>
+#include <zephyr/rtio/async_shim.h>
 
 #include "akm09918c.h"
 
 LOG_MODULE_DECLARE(AKM09918C, CONFIG_SENSOR_LOG_LEVEL);
 
-void akm09918c_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
+void akm09918c_submit_sync(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
 {
 	uint32_t min_buf_len = sizeof(struct akm09918c_encoded_data);
 	int rc;
@@ -37,4 +40,13 @@ void akm09918c_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe
 	}
 
 	rtio_iodev_sqe_ok(iodev_sqe, 0);
+}
+
+void akm09918c_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
+{
+	struct rtio_async_shim_req *req = rtio_async_shim_req_alloc();
+
+	__ASSERT_NO_MSG(req);
+
+	rtio_async_shim_req_submit(req, dev, iodev_sqe, akm09918c_submit_sync);
 }
