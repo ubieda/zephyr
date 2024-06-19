@@ -1,15 +1,18 @@
 /*
  * Copyright (c) 2024 Intel Corporation
+ * Copyright (c) 2024 Croxel Inc.
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/rtio/async_shim.h>
 #include <zephyr/logging/log.h>
 
 #include "bme280.h"
 
 LOG_MODULE_DECLARE(BME280, CONFIG_SENSOR_LOG_LEVEL);
 
-void bme280_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
+void bme280_submit_sync(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
 {
 	uint32_t min_buf_len = sizeof(struct bme280_encoded_data);
 	int rc;
@@ -56,4 +59,13 @@ void bme280_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
 	}
 
 	rtio_iodev_sqe_ok(iodev_sqe, 0);
+}
+
+void bme280_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
+{
+	struct rtio_async_shim_req *req = rtio_async_shim_req_alloc();
+
+	__ASSERT_NO_MSG(req);
+
+	rtio_async_shim_req_submit(req, dev, iodev_sqe, bme280_submit_sync);
 }
