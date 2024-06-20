@@ -1,0 +1,5 @@
+tests:
+  rtio.async_shim:
+    tags: rtio
+    integration_platforms:
+      - native_sim
