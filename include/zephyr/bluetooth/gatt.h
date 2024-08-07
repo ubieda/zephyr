@@ -233,6 +233,15 @@ struct bt_gatt_cb {
 	 */
 	void (*att_mtu_updated)(struct bt_conn *conn, uint16_t tx, uint16_t rx);
 
+	/** @brief The Unenhanced ATT MTU on a connection has changed.
+	 *
+	 * This callback notifies the application of an update on the
+	 * Unenhanced ATT MTU. It differentiates from @ref att_mtu_updated
+	 * in that this callback does not consider MTU changes on dynamic
+	 * L2CAP channels (EATT).
+	 */
+	void (*uatt_mtu_updated)(struct bt_conn *conn, uint16_t mtu);
+
 	sys_snode_t node;
 };
 

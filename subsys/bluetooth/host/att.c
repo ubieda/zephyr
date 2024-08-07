@@ -3847,6 +3847,13 @@ static void att_chan_mtu_updated(struct bt_att_chan *updated_chan)
 		max_rx = MAX(max_rx, chan->chan.rx.mtu);
 	}
 
+	/* Notify if the MTU changed on the Unenhanced ATT channel */
+	if (!bt_att_is_enhanced(updated_chan)) {
+		uint16_t mtu = bt_att_mtu(updated_chan);
+
+		bt_gatt_uatt_max_mtu_changed(att->conn, mtu);
+	}
+
 	/* If either maximum MTU has changed */
 	if ((updated_chan->chan.tx.mtu > max_tx) ||
 	    (updated_chan->chan.rx.mtu > max_rx)) {
