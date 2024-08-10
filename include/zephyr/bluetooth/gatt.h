@@ -1380,6 +1380,17 @@ bool bt_gatt_is_subscribed(struct bt_conn *conn,
  */
 uint16_t bt_gatt_get_mtu(struct bt_conn *conn);
 
+/** @brief Get UATT MTU for a connection
+ *
+ *  Get negotiated UATT connection MTU, note that this does not equal the largest
+ *  amount of attribute data that can be transferred within a single packet.
+ *
+ *  @param conn Connection object.
+ *
+ *  @return MTU in bytes
+ */
+uint16_t bt_gatt_get_uatt_mtu(struct bt_conn *conn);
+
 /** @} */
 
 /**
