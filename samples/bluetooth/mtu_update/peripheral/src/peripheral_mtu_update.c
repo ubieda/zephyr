@@ -11,6 +11,7 @@
 #include <zephyr/sys/printk.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/sys/util.h>
 
@@ -26,6 +27,8 @@ static const struct bt_data adv_ad_data[] = {
 	BT_DATA_BYTES(BT_DATA_UUID128_ALL, MTU_TEST_SERVICE_TYPE),
 	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
+
+static struct bt_conn *default_conn;
 
 static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
@@ -46,7 +49,35 @@ void mtu_updated(struct bt_conn *conn, uint16_t tx, uint16_t rx)
 	printk("Updated MTU: TX: %d RX: %d bytes\n", tx, rx);
 }
 
-static struct bt_gatt_cb gatt_callbacks = {.att_mtu_updated = mtu_updated};
+void uatt_mtu_updated(struct bt_conn *conn, uint16_t mtu)
+{
+	printk("Updated UATT MTU: %d\n", mtu);
+}
+
+static struct bt_gatt_cb gatt_callbacks = {
+	.att_mtu_updated = mtu_updated,
+	.uatt_mtu_updated = uatt_mtu_updated,
+};
+
+static void connected(struct bt_conn *conn, uint8_t err)
+{
+	if (err != 0) {
+		return;
+	}
+
+	default_conn = bt_conn_ref(conn);
+}
+
+static void disconnected(struct bt_conn *conn, uint8_t reason)
+{
+	bt_conn_unref(conn);
+	default_conn = NULL;
+}
+
+BT_CONN_CB_DEFINE(conn_callbacks) = {
+	.connected = connected,
+	.disconnected = disconnected,
+};
 
 void run_peripheral_sample(uint8_t *notify_data, size_t notify_data_size, uint16_t seconds)
 {
@@ -69,6 +100,14 @@ void run_peripheral_sample(uint8_t *notify_data, size_t notify_data_size, uint16
 
 	for (int i = 0; (i < seconds) || infinite; i++) {
 		k_sleep(K_SECONDS(1));
-		bt_gatt_notify(NULL, notify_crch, notify_data, notify_data_size);
+		/* Only send the notification if the UATT MTU supports the required length */
+		if (bt_gatt_get_uatt_mtu(default_conn) >= (notify_data_size + 3)) {
+			bt_gatt_notify(default_conn, notify_crch, notify_data, notify_data_size);
+		} else {
+			printk("Skipping notification since UATT MTU is not sufficient."
+			       "Required: %d, Actual: %d\n",
+			       notify_data_size + 3,
+			       bt_gatt_get_uatt_mtu(default_conn));
+		}
 	}
 }
