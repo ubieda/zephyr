@@ -43,6 +43,20 @@ struct k_p4wq_work {
 	struct k_p4wq *queue;
 };
 
+/**
+ * @brief P4 Queue Delayable Work Item
+ *
+ * This item is similar to the p4wq_work, with the distinction that it allows
+ * scheduling the item's execution until after a timeout period.
+ */
+struct k_p4wq_work_delayable {
+	/* The work item */
+	struct k_p4wq_work work;
+
+	/* Timeout used to submit work after a delay */
+	struct _timeout timeout;
+};
+
 #define K_P4WQ_QUEUE_PER_THREAD		BIT(0)
 #define K_P4WQ_DELAYED_START		BIT(1)
 #define K_P4WQ_USER_CPU_MASK		BIT(2)
@@ -204,6 +218,48 @@ bool k_p4wq_cancel(struct k_p4wq *queue, struct k_p4wq_work *item);
  * @brief Regain ownership of the work item, wait for completion if it's synchronous
  */
 int k_p4wq_wait(struct k_p4wq_work *work, k_timeout_t timeout);
+
+/**
+ * @brief Schedule a P4 work item after a delay.
+ *
+ * This will submit the item after a delay. If the item is already scheduled,
+ * it will not re-schedule it.
+ *
+ * @param queue P4 Queue to which to submit
+ * @param item Delayable P4 work item to be submitted.
+ * @param delay Time to wait before item is submitted. If @c K_NO_WAIT and the
+ * work is not pending, it will immediately submit it.
+ *
+ * @retval 0 if work was already scheduled or submitted.
+ * @retval 1 if work has been scheduled.
+ * @retval 2 if @p delay is @c K_NO_WAIT and work item has been queued.
+ * @retval Negative error code upon failure.
+ */
+int k_p4wq_schedule(struct k_p4wq *queue, struct k_p4wq_work_delayable *item,
+		    k_timeout_t delay);
+
+/**
+ * @brief Schedule a P4 work item after a delay.
+ *
+ * As opposed to k_p4wq_schedule, this function can change the deadline of a
+ * scheduled item.
+ *
+ * @param queue P4 Queue to which to submit
+ * @param item Delayable P4 work item to be submitted.
+ * @param delay Time to wait before item is submitted. If @c K_NO_WAIT and the
+ * work is not pending, it will immediately submit it.
+ *
+ * @retval 0 if work was already scheduled or submitted.
+ * @retval 1 if
+ * * delay is @c K_NO_WAIT and work was not submitted but has now been queued
+ *   to @p queue; or
+ * * delay not @c K_NO_WAIT and work has been scheduled
+ * @retval 2 if delay is @c K_NO_WAIT and work was running and has been queued
+ * to the queue that was running it.
+ * @retval Negative error code upon failure.
+ */
+int k_p4wq_reschedule(struct k_p4wq *queue, struct k_p4wq_work_delayable *item,
+		      k_timeout_t delay);
 
 void k_p4wq_enable_static_thread(struct k_p4wq *queue, struct k_thread *thread,
 				 uint32_t cpu_mask);
