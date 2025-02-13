@@ -316,8 +316,9 @@ void adxl345_accel_convert(struct sensor_value *val, int16_t sample)
 		sample |= ADXL345_COMPLEMENT;
 	}
 
-	val->val1 = ((sample * SENSOR_G) / 32) / 1000000;
-	val->val2 = ((sample * SENSOR_G) / 32) % 1000000;
+	/** Conversion valid for ADXL345_RANGE_8G */
+	val->val1 = ((sample * SENSOR_G) / 64) / 1000000;
+	val->val2 = ((sample * SENSOR_G) / 64) % 1000000;
 }
 
 static int adxl345_sample_fetch(const struct device *dev,
@@ -418,7 +419,7 @@ static int adxl345_interrupt_config(const struct device *dev,
 		return ret;
 	}
 
-	ret = adxl345_reg_write_byte(dev, ADXL345_INT_ENABLE, int1);
+	ret = adxl345_reg_write_byte(dev, ADXL345_INT_ENABLE, 0x02);
 	if (ret) {
 		return ret;
 	}
@@ -481,7 +482,7 @@ static int adxl345_init(const struct device *dev)
 
 #ifdef CONFIG_ADXL345_TRIGGER
 	rc = adxl345_configure_fifo(dev, ADXL345_FIFO_STREAMED,
-				     ADXL345_INT2,
+				     ADXL345_INT1,
 				     SAMPLE_NUM);
 	if (rc) {
 		return rc;
@@ -505,7 +506,7 @@ static int adxl345_init(const struct device *dev)
 	if (rc) {
 		return rc;
 	}
-	rc = adxl345_interrupt_config(dev, ADXL345_INT_MAP_WATERMARK_MSK);
+	rc = adxl345_interrupt_config(dev, ADXL345_INT1);
 	if (rc) {
 		return rc;
 	}
@@ -560,7 +561,7 @@ static int adxl345_init(const struct device *dev)
 #define ADXL345_CONFIG(inst)								\
 		.odr = DT_INST_PROP(inst, odr),						\
 		.fifo_config.fifo_mode = ADXL345_FIFO_STREAMED,				\
-		.fifo_config.fifo_trigger = ADXL345_INT2,			\
+		.fifo_config.fifo_trigger = ADXL345_INT1,			\
 		.fifo_config.fifo_samples = SAMPLE_NUM,					\
 		.odr = ADXL345_RATE_25HZ,						\
 

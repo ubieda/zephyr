@@ -26,6 +26,9 @@ static void adxl345_thread_cb(const struct device *dev)
 
 	/* Clear the status */
 	if (adxl345_get_status(dev, &status1, NULL) < 0) {
+		volatile int i = 0;
+		i++;
+		LOG_WRN("Failed to get Trigger Status");
 		return;
 	}
 
@@ -34,8 +37,8 @@ static void adxl345_thread_cb(const struct device *dev)
 		drv_data->drdy_handler(dev, drv_data->drdy_trigger);
 	}
 
-	ret = gpio_pin_interrupt_configure_dt(&cfg->interrupt,
-					      GPIO_INT_EDGE_TO_ACTIVE);
+	// ret = gpio_pin_interrupt_configure_dt(&cfg->interrupt,
+	// 				      GPIO_INT_EDGE_TO_ACTIVE);
 	__ASSERT(ret == 0, "Interrupt configuration failed");
 }
 #endif
@@ -47,7 +50,7 @@ static void adxl345_gpio_callback(const struct device *dev,
 		CONTAINER_OF(cb, struct adxl345_dev_data, gpio_cb);
 	const struct adxl345_dev_config *cfg = drv_data->dev->config;
 
-	gpio_pin_interrupt_configure_dt(&cfg->interrupt, GPIO_INT_DISABLE);
+	// gpio_pin_interrupt_configure_dt(&cfg->interrupt, GPIO_INT_DISABLE);
 
 	if (IS_ENABLED(CONFIG_ADXL345_STREAM)) {
 		adxl345_stream_irq_handler(drv_data->dev);
@@ -110,11 +113,17 @@ int adxl345_trigger_set(const struct device *dev,
 		return -ENOTSUP;
 	}
 
-	if (handler) {
-		int_en = int_mask;
-	} else {
-		int_en = 0U;
+	ret = adxl345_reg_write_byte(dev, ADXL345_INT_ENABLE, 0x00);
+	if (ret) {
+		return ret;
 	}
+
+	// if (handler) {
+	// 	int_en = int_mask;
+	// } else {
+	// 	int_en = 0U;
+	// }
+	int_en = 0U;
 
 	ret = adxl345_reg_write_mask(dev, ADXL345_INT_MAP, int_mask, int_en);
 	if (ret < 0) {
@@ -129,6 +138,12 @@ int adxl345_trigger_set(const struct device *dev,
 	ret = gpio_pin_interrupt_configure_dt(&cfg->interrupt,
 					      GPIO_INT_EDGE_TO_ACTIVE);
 	if (ret < 0) {
+		return ret;
+	}
+
+
+	ret = adxl345_reg_write_byte(dev, ADXL345_INT_ENABLE, 0x02);
+	if (ret) {
 		return ret;
 	}
 
